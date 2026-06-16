@@ -42,38 +42,37 @@ document.querySelectorAll('.emb-toggle').forEach((toggle) => {
         if (newHref) link.href = newHref;
       });
 
-      // Cards without a black variant – only Focus/Endure/Try harder hoodies
+      // Cards without a black variant – Focus/Endure/Try harder hoodies only
       const noBlackCards = [...category.querySelectorAll('.product-card')]
         .filter(card => !card.hasAttribute('data-emb-black'));
 
       if (!grid || noBlackCards.length === 0) return;
 
-      const FADE_MS    = 220; // matches .product-card opacity transition (180ms) + buffer
-      const COLLAPSE_MS = 400;
+      const FADE_MS    = 220;  // card fade-out duration
+      const COLLAPSE_MS = 320; // grid height animation duration
 
       clearTimeout(grid._t1);
       clearTimeout(grid._t2);
+      clearTimeout(grid._t3);
 
       if (emb === 'black') {
-        // 1. Snapshot full grid height before any changes
+        // ── Hiding: fade cards → collapse grid ──────────────────────────
         const h0 = grid.getBoundingClientRect().height;
 
-        // 2. Fade out cards (visual only – no layout change yet)
         noBlackCards.forEach(card => {
           card.style.display = '';
           card.classList.add('card-hidden');
         });
 
-        // 3. After fade: lock height, remove cards from layout, animate collapse
         grid._t1 = setTimeout(() => {
-          // Lock grid at h0 so no jump when display:none fires
+          // Lock height so display:none causes no visible snap
           grid.style.transition = 'none';
           grid.style.overflow   = 'hidden';
           grid.style.height     = h0 + 'px';
 
           noBlackCards.forEach(card => { card.style.display = 'none'; });
 
-          // Temporarily release to measure natural collapsed height, then lock back
+          // Measure natural collapsed height, then animate
           grid.style.height = '';
           const h1 = grid.getBoundingClientRect().height;
           grid.style.height = h0 + 'px';
@@ -87,40 +86,44 @@ document.querySelectorAll('.emb-toggle').forEach((toggle) => {
             grid.style.height     = '';
             grid.style.transition = '';
             grid.style.overflow   = '';
-          }, COLLAPSE_MS + 60);
+          }, COLLAPSE_MS + 50);
         }, FADE_MS);
 
       } else {
-        // 1. Snapshot current (collapsed) height
+        // ── Showing: expand grid first → then fade cards in ─────────────
+        // This avoids cards being visible while still clipped by overflow.
         const h0 = grid.getBoundingClientRect().height;
 
-        // 2. Restore cards to layout but keep invisible for measurement
         noBlackCards.forEach(card => {
           card.style.display = '';
-          card.classList.add('card-hidden');
+          card.classList.add('card-hidden'); // invisible during measurement
         });
 
-        // 3. Measure expanded height
         const h1 = grid.getBoundingClientRect().height;
 
-        // 4. Lock at h0, then animate to h1 while fading cards in
         grid.style.transition = 'none';
         grid.style.overflow   = 'hidden';
         grid.style.height     = h0 + 'px';
 
+        // Animate height to expanded
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             grid.style.transition = `height ${COLLAPSE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
             grid.style.height     = h1 + 'px';
-            noBlackCards.forEach(card => card.classList.remove('card-hidden'));
           });
         });
 
+        // Only after height is fully expanded: remove clip and fade in cards
         grid._t2 = setTimeout(() => {
-          grid.style.height     = '';
-          grid.style.transition = '';
-          grid.style.overflow   = '';
-        }, COLLAPSE_MS + 60);
+          grid.style.overflow = '';
+          noBlackCards.forEach(card => card.classList.remove('card-hidden'));
+
+          // Clean up inline height after card fade completes
+          grid._t3 = setTimeout(() => {
+            grid.style.height     = '';
+            grid.style.transition = '';
+          }, 250);
+        }, COLLAPSE_MS + 20);
       }
     });
   });
